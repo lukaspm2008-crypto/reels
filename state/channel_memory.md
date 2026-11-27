@@ -27,16 +27,26 @@ Read this before every run. Update it after every analytics review. Keep it shor
 - H3: Description line "Send this to someone who…" increases shares.
 - H4: Which category performs best? Use a different category for the two daily videos until each category has ≥ 2 videos, then weight slots toward the winners.
 
+- H1 status: 001 = invisible mechanism, 002 = relatable moment, 003 = hard number → compare once all three have ≥ 24 h data.
+
+## Data access notes
+- YouTube analytics are readable via the Windsor.ai connector (connector "youtube", account 126165) without Chrome; cache only, no on-demand refresh → same-day videos may not show yet. TikTok is not on Windsor → needs Chrome.
+- Scheduled cloud runs have had no Chrome access (2026-11-27) → uploads stay "pending upload" until a run with Lukas' Chrome.
+
+## Fact notes
+- Doorway effect replicates weakly (McFadyen et al. 2021, BMC Psychology: mainly under cognitive load) – keep the "busy mind" caveat.
+- Zeigarnik memory advantage has poor replication – avoid as a "fact" topic or frame it carefully.
+
+- H4 note: 002 + 003 (both psychology) were built before the category rule arrived → next runs should pick non-psychology categories first.
+
 ## Topic backlog (not used yet – ideas, not a must; any category is fine)
 - Tip-of-the-tongue / "Treppenwitz" (l'esprit de l'escalier) – why the perfect comeback comes too late
-- Cocktail party effect – hearing your own name in a loud room
-- Zeigarnik effect – unfinished tasks keep you up at night
+- Zeigarnik effect – unfinished tasks keep you up at night (see fact note: weak replication)
 - Baader-Meinhof (frequency illusion) – suddenly seeing it everywhere
 - Pratfall effect – small mistakes make competent people more likable
 - Ben Franklin effect – asking a favour makes people like you more
 - Mere-exposure effect – why songs grow on you
 - Peak-end rule – how you remember a whole day/holiday
-- Doorway effect – forgetting why you walked into a room
 - Hedonic adaptation – why new stuff stops feeling exciting
 - Body: why you can't tickle yourself · why we yawn when others yawn · goosebumps are a leftover reflex
 - Science/space: a day on Venus is longer than its year · bananas are slightly radioactive · you're made of star dust
