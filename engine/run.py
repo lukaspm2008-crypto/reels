@@ -6,8 +6,14 @@ usage:
 
 An episode folder holds episode.py with: META, VOICE, SPEED, LINES (one per scene), CAPS (caption blocks per scene),
 optional TAIL / DESIGN_DUR, SCENES (list of scene functions f(canvas, t, D)), sfx_cues(put, S, K, D, fx).
+Optional (engine v2):
+  TRANSITIONS = ['whip', 'zoom', 'wipe', 'whipv', 'cut', ...]  one per scene boundary (n-1; never at the loop seam).
+                Default: whip/zoom/wipe rotation. ~0.27 s centred on the cut, whoosh SFX added automatically.
+  TRANSITION_SFX = True    auto whoosh at every transition
+  AMBIENCE = ['room', 'cafe', None, ('birds', 0.8), ...]  one bed per scene (see sfx.AMBIENCES), crossfaded, ducked under VO
+  POST = True | {'vig': 64, 'grain': 1.0}   final look pass (vignette + paper grain); False disables
 """
-import os, sys, json, math, subprocess, importlib.util, wave
+import os, sys, json, math, time, subprocess, importlib.util, wave
 import numpy as np
 
 ENGINE = os.path.dirname(os.path.abspath(__file__))
@@ -62,7 +68,11 @@ class Timeline:
         self.K = [self.DUR[i] / self.DESIGN[i] for i in range(n)]
         self.CAPT = [self.cap_times(ep.CAPS[i], i) for i in range(n)]
         self.frames = [int(round((self.START[i] + self.DUR[i]) * lib.FPS)) - int(round(self.START[i] * lib.FPS)) for i in range(n)]
+        self.F0 = [sum(self.frames[:i]) for i in range(n)]
         self.TOTAL = sum(self.frames) / lib.FPS
+        tr = getattr(ep, 'TRANSITIONS', None)
+        if tr is None: tr = [('whip', 'zoom', 'wipe')[k % 3] for k in range(n - 1)]
+        self.TR = (list(tr) + ['cut'] * n)[:n - 1]
 
     def cap_times(self, blocks, i):
         wts = []
@@ -77,9 +87,88 @@ class Timeline:
         return out
 
 
-def draw_frame(surf, ep, tl, i, t):
-    c = surf.getCanvas(); c.clear(lib.C(lib.CREAM))
+TRANS_H = 4          # frames on each side of a cut -> 8 frames ~ 0.27 s
+_AUX = []
+
+
+def _aux(k):
+    import skia
+    while len(_AUX) <= k: _AUX.append(skia.Surface(lib.W, lib.H))
+    return _AUX[k]
+
+
+def scene_into(c, ep, tl, i, t):
+    c.clear(lib.C(lib.CREAM))
     c.save(); ep.SCENES[i](c, t / tl.K[i], tl.DESIGN[i]); c.restore()
+
+
+def _smoother(p):
+    p = min(1.0, max(0.0, p)); return p * p * p * (p * (p * 6 - 15) + 10)
+
+
+def composite(c, kind, p, imA, imB):
+    """transition between outgoing image A and incoming image B at progress p (0..1)"""
+    import skia
+    W, H = lib.W, lib.H
+    lin = skia.SamplingOptions(skia.FilterMode.kLinear)
+    if kind in ('whip', 'whipv'):
+        e = _smoother(p); speed = (W if kind == 'whip' else H) * 30 * p * p * (1 - p) * (1 - p) / (2 * TRANS_H)
+        sig = min(80.0, speed * 0.32)
+        tmp = _aux(2); tc = tmp.getCanvas(); tc.clear(lib.C(lib.CREAM))
+        if kind == 'whip':
+            tc.drawImage(imA, -W * e, 0); tc.drawImage(imB, W * (1 - e), 0)
+            blur = skia.ImageFilters.Blur(sig, sig * 0.05, skia.TileMode.kClamp)
+        else:
+            tc.drawImage(imA, 0, -H * e); tc.drawImage(imB, 0, H * (1 - e))
+            blur = skia.ImageFilters.Blur(sig * 0.05, sig, skia.TileMode.kClamp)
+        pt = skia.Paint(); pt.setImageFilter(blur)
+        c.clear(lib.C(lib.CREAM)); c.drawImage(tmp.makeImageSnapshot(), 0, 0, lin, pt)
+    elif kind == 'zoom':
+        c.clear(lib.C(lib.CREAM))
+        if p < 0.5:
+            q = p / 0.5; z = 1 + 0.85 * q * q; sig = 26 * q; im = imA
+        else:
+            q = (p - 0.5) / 0.5; z = 1.45 - 0.45 * (1 - (1 - q) ** 2); sig = 26 * (1 - q); im = imB
+        pt = skia.Paint(); pt.setImageFilter(skia.ImageFilters.Blur(sig, sig, skia.TileMode.kClamp))
+        c.save(); c.translate(540, 900); c.scale(z, z); c.translate(-540, -900)
+        c.drawImage(im, 0, 0, lin, pt); c.restore()
+        fl = 1 - abs(p - 0.5) / 0.2
+        if fl > 0: c.drawRect(skia.Rect.MakeWH(W, H), lib.P('#FFFFFF', 110 * fl))
+    elif kind == 'wipe':
+        BW, tn = 120, math.tan(math.radians(14))
+        lead = -280 + (W + 560 + 4 * BW) * p
+        def region(e):
+            pth = skia.Path(); pth.moveTo(-2000, -20); pth.lineTo(e + (-20 - 960) * tn, -20); pth.lineTo(e + (H + 20 - 960) * tn, H + 20); pth.lineTo(-2000, H + 20); pth.close()
+            return pth
+        c.clear(lib.C(lib.CREAM)); c.drawImage(imA, 0, 0)
+        for k, col in enumerate((lib.YEL, lib.CORAL, lib.SKY, lib.NAVY)):
+            r = region(lead - k * BW); c.drawPath(r, lib.P(col)); c.drawPath(r, lib.P(lib.NAVY, 255, 6))
+        c.save(); c.clipPath(region(lead - 4 * BW), doAntiAlias=True); c.drawImage(imB, 0, 0); c.restore()
+    else:
+        c.drawImage(imB if p >= 0.5 else imA, 0, 0)
+
+
+def draw_frame(surf, ep, tl, i, t):
+    f = int(round(t * lib.FPS)); g = tl.F0[i] + f
+    lib.set_clock(g / lib.FPS, tl.TOTAL, g)
+    c = surf.getCanvas()
+    tr = None
+    if i < tl.n - 1 and f >= tl.frames[i] - TRANS_H and tl.TR[i] != 'cut': tr = (tl.TR[i], i, f - tl.frames[i])
+    elif i > 0 and f < TRANS_H and tl.TR[i - 1] != 'cut': tr = (tl.TR[i - 1], i - 1, f)
+    if tr is None:
+        scene_into(c, ep, tl, i, t)
+    else:
+        kind, a, j = tr
+        p = (j + TRANS_H + 0.5) / (2 * TRANS_H)
+        tA = t if i == a else (tl.frames[a] - 1) / lib.FPS
+        tB = t if i == a + 1 else 0.0
+        sa, sb = _aux(0), _aux(1)
+        scene_into(sa.getCanvas(), ep, tl, a, tA); scene_into(sb.getCanvas(), ep, tl, a + 1, tB)
+        composite(c, kind, p, sa.makeImageSnapshot(), sb.makeImageSnapshot())
+    post = getattr(ep, 'POST', True)
+    if post:
+        kw = post if isinstance(post, dict) else {}
+        lib.post(c, **kw)
     lib.caption(c, tl.CAPT[i], t)
 
 
@@ -88,7 +177,7 @@ def render_scene(ep_dir, i):
     tl = Timeline(ep, json.load(open(os.path.join(build, 'vo_info.json'))))
     out = os.path.join(build, f'scene{i + 1:02d}.mp4'); tmp = out[:-4] + '.tmp.mp4'
     pr = subprocess.Popen(['ffmpeg', '-y', '-loglevel', 'error', '-f', 'rawvideo', '-pix_fmt', 'rgba', '-s', f'{lib.W}x{lib.H}',
-                           '-r', str(lib.FPS), '-i', '-', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '18',
+                           '-r', str(lib.FPS), '-i', '-', '-c:v', 'libx264', '-preset', 'superfast', '-crf', '17',
                            '-pix_fmt', 'yuv420p', '-r', str(lib.FPS), tmp], stdin=subprocess.PIPE)
     import skia
     surf = skia.Surface(lib.W, lib.H)
@@ -110,8 +199,27 @@ def mix(ep, tl, vo, build, seed=0):
         a = np.load(os.path.join(build, f'vo{i + 1:02d}.npy')) / 32768.0
         fx.put(v, tl.START[i] + tl.LEAD[i], resample_poly(a, SR // g, vo['sr'] // g))
     ep.sfx_cues(lambda t, x, gain=1.0: fx.put(s, t, x, gain), tl.START, tl.K, tl.DUR, fx)
+    # automatic whoosh on every scene transition
+    if getattr(ep, 'TRANSITION_SFX', True):
+        for k, kind in enumerate(tl.TR):
+            if kind == 'cut': continue
+            tb = tl.F0[k + 1] / lib.FPS
+            x = fx.transition_whoosh(kind)
+            fx.put(s, max(0, tb - len(x) / SR * 0.55), x, 0.55)
+    # ambience beds per scene (crossfaded, lightly ducked)
+    amb = np.zeros(N)
+    beds = getattr(ep, 'AMBIENCE', None)
+    if beds:
+        for i, b in enumerate(beds[:tl.n]):
+            if not b: continue
+            name, g = (b, 1.0) if isinstance(b, str) else b
+            t0 = max(0, tl.START[i] - 0.25); d = tl.DUR[i] + 0.5
+            x = fx.ambience(name, d, seed=i)
+            fo = int(0.25 * SR); env = np.ones(len(x)); env[:fo] = np.linspace(0, 1, fo); env[-fo:] = np.linspace(1, 0, fo)
+            fx.put(amb, t0, x * env, g)
+        amb = fx.duck(amb, v, 0.35)
     m = fx.duck(fx.music_bed(tl.TOTAL + 1, seed)[:N], v)
-    full = fx.hp(v, 90) + s * 0.3 + m * 0.16
+    full = fx.hp(v, 90) + s * 0.3 + m * 0.16 + amb * 0.22
     full = full / max(1e-9, np.max(np.abs(full))) * 0.89
     p = os.path.join(build, 'mix.wav')
     w = wave.open(p, 'wb'); w.setnchannels(1); w.setsampwidth(2); w.setframerate(SR)
@@ -120,6 +228,7 @@ def mix(ep, tl, vo, build, seed=0):
 
 
 def build_all(ep_dir, procs=2):
+    T0 = time.time()
     ep = load_episode(ep_dir); build = os.path.join(ep_dir, 'build'); os.makedirs(build, exist_ok=True)
     assert len(ep.LINES) == len(ep.CAPS) == len(ep.SCENES), 'LINES, CAPS and SCENES must have the same length'
     vo = tts(ep, build); tl = Timeline(ep, vo)
@@ -128,6 +237,7 @@ def build_all(ep_dir, procs=2):
     buckets = [order[k::procs] for k in range(procs)]
     ps = [subprocess.Popen([sys.executable, __file__, ep_dir, 'scenes'] + [str(i) for i in b]) for b in buckets]
     if any(p.wait() for p in ps): raise SystemExit('render failed')
+    print('render', round(time.time() - T0, 1), 's', flush=True)
     lst = os.path.join(build, 'list.txt')
     open(lst, 'w').write(''.join(f"file 'scene{i + 1:02d}.mp4'\n" for i in range(tl.n)))
     vid = os.path.join(build, 'video_only.mp4')
@@ -137,12 +247,20 @@ def build_all(ep_dir, procs=2):
     subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-i', vid, '-i', wav, '-map', '0:v', '-map', '1:a', '-c:v', 'copy',
                     '-af', 'loudnorm=I=-14:TP=-1.5:LRA=11,aresample=48000', '-c:a', 'aac', '-b:a', '192k', '-shortest',
                     '-movflags', '+faststart', final], check=True)
-    # browser uploads are capped at 3.8 MB -> make a copy below 3.6 MB
-    up = os.path.join(build, 'upload.mp4')
-    for crf in (27, 29, 31, 33, 35):
-        subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-i', final, '-c:v', 'libx264', '-preset', 'slow', '-crf', str(crf),
-                        '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', up], check=True)
+    print('mux+mix', round(time.time() - T0, 1), 's', flush=True)
+    # browser uploads are capped at 3.8 MB -> 2-pass encode at a bitrate that lands just below 3.6 MB
+    up = os.path.join(build, 'upload.mp4'); crf = '2pass'
+    abr = 128
+    for target in (3.45e6, 3.3e6, 3.1e6):
+        vbr = int(target * 8 / tl.TOTAL / 1000) - abr - 12
+        common = ['-c:v', 'libx264', '-preset', 'medium', '-b:v', f'{vbr}k', '-pix_fmt', 'yuv420p', '-tune', 'animation']
+        plog = os.path.join(build, 'x264pass')
+        subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-i', final] + common + ['-pass', '1', '-passlogfile', plog, '-an', '-f', 'mp4', os.devnull], check=True)
+        subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-i', final] + common + ['-pass', '2', '-passlogfile', plog, '-c:a', 'aac', '-b:a', f'{abr}k',
+                        '-movflags', '+faststart', up], check=True)
         if os.path.getsize(up) < 3.6e6: break
+    for f in os.listdir(build):
+        if f.startswith('x264pass'): os.remove(os.path.join(build, f))
     # QA contact sheet: middle frame of every scene
     from PIL import Image
     tiles = []
@@ -156,7 +274,8 @@ def build_all(ep_dir, procs=2):
     sheet.save(os.path.join(build, 'contact.png'))
     for f in os.listdir(build):
         if f.startswith('qa') or f.startswith('scene') or f in ('video_only.mp4', 'list.txt'): os.remove(os.path.join(build, f))
-    print('DONE', final, round(tl.TOTAL, 2), 's | upload copy', round(os.path.getsize(up) / 1e6, 2), 'MB', flush=True)
+    print('DONE', final, round(tl.TOTAL, 2), 's | upload copy', round(os.path.getsize(up) / 1e6, 2), 'MB | build',
+          round(time.time() - T0, 1), 's', flush=True)
 
 
 if __name__ == '__main__':

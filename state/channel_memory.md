@@ -8,7 +8,8 @@ Read this before every run. Update it after every analytics review. Keep it shor
   Let the analytics decide which categories get more slots (see TEST H4).
 - Platforms: YouTube Shorts (channel "Mysteriöse Fakten") + TikTok (same account as in Lukas' Chrome).
   Note: the YouTube channel's older videos are German mystery content – mismatch with the new English psychology format.
-- Posting: 2 videos per day. Slot A publishes **08:00 Europe/Berlin**, slot B publishes **23:00 Europe/Berlin** (= 5 pm ET, US after-school peak).
+- Posting: 2 videos per day at **English prime time** (Lukas, 2026-11-27: not German times). Slot A **16:00 America/New_York** (US after school, UK 21:00), slot B **20:00 America/New_York** (US prime time) – see RUNBOOK 3.
+- Comments (Lukas, 2026-11-27): pinned English fact comment per video + auto-replies to new comments every run – see RUNBOOK 3b.
 - Voice: Kokoro `af_heart`, speed 1.1 (Lukas approved this voice on 2026-11-27; earlier German TTS voices were rejected as "scheiße").
 - Style-lock: flat 2D vector, cream background, coral/sky/yellow/navy palette, recurring character **Mika** (mustard hoodie).
   Big navy headline plate at top (max 3–4 words, one word highlighted yellow), caption pill at y≈1470 (2–4 words, highlights).

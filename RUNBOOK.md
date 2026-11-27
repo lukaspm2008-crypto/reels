@@ -38,15 +38,15 @@ Run the two agents one after the other (they share the CPU).
   last line that flows grammatically back into line 1 (seamless loop). Short, spoken, no filler ("In this video…").
 
 ### 2b Episode code
-- `cp -r episodes/001-spotlight-effect episodes/<NNN>-<slug>`; delete its `build/`; edit `episode.py`:
+- `cp -r episodes/002-doorway-effect episodes/<NNN>-<slug>` (engine-v2 reference); delete its `build/`; edit `episode.py`:
   META (id, topic, source, youtube_title ≤ 70 chars incl. "#shorts", youtube_description, tiktok_caption, both with 4 hashtags and a
-  "Send this to someone who…" line), LINES, CAPS (2–4 words per block, `*word*` = yellow highlight), TAIL, **remove DESIGN_DUR**,
+  "Send this to someone who…" line, `fact_comment` – see 3b), LINES, CAPS (2–4 words per block, `*word*` = yellow highlight), TAIL, **remove DESIGN_DUR**,
   write 12 new scene functions `sN(c, t, D)` (t = seconds into the scene, D = scene length) and `SCENES`, and `sfx_cues`.
 - Reuse `engine/lib.py`: `mika()`, `person()`, `bust()`, `head()`, `beam()`, `room()`/`GRID`, `stage()`, `classroom_bg()`,
   `classmates_desks()`, `ost()` (top headline, max 3–4 words), easing `eout/eback/einout/ebounce`, `cam()` for zooms.
   Add new props as functions inside the episode (or in lib.py if reusable).
 - Rules: a new visual impulse every ≤ 3.5 s (zoom, pop, cut, counter…), something moving in frame 0 (no static first frame),
-  numbers shown on screen, lower third (y > 1380) kept free except captions, last scene ends on the exact first frame of scene 1
+  numbers shown on screen, no text/key info in the lower third (y > 1380) except captions (floor/props there are fine), last scene ends on the exact first frame of scene 1
   (see 001's `s12` crossfade) so the loop is seamless. No real people, brands, logos or copyrighted characters.
 - **Quality bar – "Liebe im Detail" (Lukas, 2026-11-27: videos must look more premium, more love in the details).** Every scene must pass:
   1. *Full frame*: no big empty areas. The subject fills the upper 2/3 (y 180–1380); floors/walls carry detail (skirting board, tiles,
@@ -62,14 +62,45 @@ Run the two agents one after the other (they share the CPU).
      scene (cafeteria murmur, birds, hum) under the voice; music ducked under VO.
   7. *Polish pass*: before the full build look at ≥ 8 test frames at full size and list for each one thing that could be nicer – fix
      the top 5. Charts/infographics are illustrated objects (paper card, whiteboard, phone screen), never bare shapes on cream.
+- **Engine features (v2, 2026-11-27)** – use these instead of hand-drawing flat shapes; `episodes/002-doorway-effect` is the reference:
+  - *Free, automatic*: `person()/mika()/bust()/head()` get contact shadow, 2-tone shading, blink every 2–4 s, breathing, sway, eye
+    saccades (driven by the global clock `lib.NOW`, cycles quantised to the loop → seam stays seamless; `idle=False` freezes, `seed=`
+    varies timing). `ost()` has a drop shadow, squash pop and per-word pop-in; `caption()` has a shadow. run.py adds a vignette +
+    paper-grain post pass (`POST = False` / `{'vig':…, 'grain':…}`) and ~0.27 s transitions between scenes with an auto whoosh.
+  - *Episode options*: `TRANSITIONS = [...]` (n-1 entries: `whip`, `whipv`, `zoom`, `wipe`, `cut`; never at the loop seam),
+    `AMBIENCE = [...]` one bed per scene (`room`, `cafe`, `birds`, `hum`, `clock`, `projector`, or `(name, gain)`), `TRANSITION_SFX`.
+  - *Time*: `osc(f, phase)` seamless idle oscillator, `loop_drift(speed, length)` seamless scrolling, `blink_amt(seed)`, `rnd(...)`.
+    Don't read `NOW` via `from lib import *` (stale copy) – use `osc()` / `lib.NOW`.
+  - *Depth*: `contact_shadow`, `box_shadow`, `shaded_rrect`, `shaded_circle`, `shaded_path` (2-tone + outline), `tint(col, f)`,
+    `blurred(col, a, sigma)`, `glow`, `with defocus(c, sigma, bounds):` (out-of-focus foreground layer, ~20 ms – use sparingly).
+  - *Backgrounds*: `bg(c, top, bot)` gradient, `radial_bg`, `sunburst(..., rot=t*10)`, `wall(c, x0,y0,x1,y1, col, 'panel'|'dots'|'stripes')`,
+    `floor(c, y, col, 'wood'|'tiles'|'carpet'|'concrete', scroll=)` (perspective floor + skirting + AO down to the bottom edge –
+    fills the lower third), `skirting`, `rug`, `light_patch`, `window(...)` (drifting clouds, curtains), `desk_top` (top-down desk).
+  - *Props*: `picture`, `plant`, `shelf`, `wall_clock` (ticking), `pendant_lamp` (swaying), `mug` (with `steam`), `pencil`,
+    `sticky_note`, `backpack`, `sneakers`, `stopwatch`, `front_door(..., open_k, number=)`, `cloud`.
+  - *Ambient*: `motes` (dust in light), `sparkles`/`sparkle`, `steam`, `speed_lines`, `dust_puff(c, x, y, u)`.
+  - *Infographics*: `with card(c, x0,y0,x1,y1, 'paper'|'whiteboard'|'phone'|'clipboard'|'blueprint'|'screen', sk=, title=) as inner:`
+    (shadowed container, content clipped inside), `sticker(text, x, y, size, bg, fg, sk=squash(u), shape='pill'|'circle'|'burst'|'tag')`
+    for key numbers, `count(t, t0, dur, v0, v1)` count-up + `count_ticks(...)` → put `fx.tick()` at those times, `squash(u)` for
+    squash & stretch pops.
+  - *SFX* (sfx.py): `swoosh`, `popm(step)` (pentatonic pops – use rising steps for series), `tick`, `ding`, `paper`, `footsteps(n)`,
+    `typing`, `crickets`, `drawer`, `camera_flash`, `boing`, `sparkle_fx`, `transition_whoosh(kind)`, `ambience(name, d)`.
+  - Render cost ≈ 2 min per episode (≈ 60 ms/frame + 2-pass upload encode). upload.mp4 is a 2-pass encode that lands at ~3.5 MB.
 - Check frames before the full build: `python3 engine/run.py episodes/<id> test 1@0.5 1@2.5 5@1 9@2 12@2` and look at the PNGs
   in `build/` (Read tool). Fix overlaps/cut-off text.
 - Build: `python3 engine/run.py episodes/<id>` → `build/final.mp4`, `build/upload.mp4` (< 3.6 MB for browser upload), `build/contact.png`.
 - Look at `contact.png`. Fix anything broken and rebuild once.
 
 ## 3 · Upload (Claude in Chrome, Lukas' logged-in Chrome)
-Load the chrome-browser skill first. Use **build/upload.mp4**. Slot A → publish **08:00 Berlin tomorrow**, slot B → **23:00 Berlin today**
-(if 23:00 already passed: publish B immediately). Use each platform's own scheduler so Lukas' PC needn't be on at publish time.
+Load the chrome-browser skill first. Use **build/upload.mp4**.
+**Publish at ENGLISH prime time, not German** (Lukas, 2026-11-27). Times are fixed in US Eastern time (`America/New_York`):
+- Slot A → **16:00 ET** (US after-school + UK evening 21:00) = 22:00 Berlin in winter.
+- Slot B → **20:00 ET** (US prime time East, 17:00 Pacific) = 02:00 Berlin next day in winter.
+Convert with `TZ=America/New_York date -d '...'` → Berlin for the platform schedulers (they show the account's time zone – check which
+zone the scheduler displays and convert to that). Mind DST: in March/Oct–Nov the US–Berlin gap is 5 h for a few weeks.
+Both slots of a run are the next upcoming 16:00 / 20:00 ET; if a slot is < 20 min away, take the next day's slot. Pending uploads from
+earlier runs take the earliest free slots first; today's new videos then take the following free slots (max 2 videos per slot-day).
+Use each platform's own scheduler so Lukas' PC needn't be on at publish time.
 - **YouTube Studio** (studio.youtube.com): upload icon top right → `find` the hidden file-input → `file_upload` → title field (ctrl+a, type
   youtube_title) → description → "Nein, es ist nicht speziell für Kinder" → Weiter ×3 → Sichtbarkeit: **Planen** (date + time) or
   Öffentlich → Planen/Veröffentlichen. Copy the Shorts link into video_log.
@@ -79,8 +110,20 @@ Load the chrome-browser skill first. Use **build/upload.mp4**. Slot A → publis
 - If Chrome is not reachable: still build + commit both episodes, mark them `pending upload` in video_log; the next run uploads them first.
 - Never claim an upload happened without seeing the platform's confirmation.
 
+## 3b · Comments (Claude in Chrome, every run, after uploads) – Lukas, 2026-11-27
+- **Fact comment (one per video, English):** as soon as a video is public (scheduled videos can't be commented before), post one comment
+  from the channel account and **pin it**: "📚 The facts:" + 2–4 short sentences: what the study actually found (numbers), its limits /
+  replication status, and the source (author, year, journal). Honest, no hype; if a later study weakened the effect, say so.
+  Store the text in META `fact_comment` (episode agent writes it) and mark `fact comment ✓ YT/TT` in video_log.
+- **Auto-reply:** open YouTube Studio → Kommentare and TikTok Studio → Kommentare; reply to every new comment on our videos since the
+  last run (track the last handled date in video_log notes). English (or the commenter's language), 1–2 sentences, friendly, a little
+  witty, on-topic; answer questions with the fact + source; thank people who share their own experience; correct misunderstandings politely.
+  Never argue, never promise things, no links except the source name, nothing personal about anyone, no replies to minors' personal info.
+  Spam, scams, hate or sexual comments: no reply – report/hide if the platform offers it, and list them for Lukas.
+  Max ~30 replies per run; if more, prioritise questions and the newest. Log `replied: N (YT n / TT n)` in the run report.
+
 ## 4 · Commit + report
 - Add rows to `state/video_log.md` (id, topic, hook type, scheduled time, links/status).
 - `git add -A && git commit -m "Run <date>: <ids>" && git -c push.negotiate=true push`.
-- Send Lukas one short German message: what was analysed (1–2 key numbers + the change), the two topics, upload status + times,
-  anything that needs him (e.g. Chrome was closed). No long reports.
+- Send Lukas one short German message: what was analysed (1–2 key numbers + the change), the two topics, upload status + times
+  (Berlin + ET), comments (fact comments posted, replies count, anything flagged), anything that needs him (e.g. Chrome was closed). No long reports.
