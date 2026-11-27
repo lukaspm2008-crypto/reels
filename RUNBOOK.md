@@ -1,6 +1,6 @@
 # RUNBOOK – daily reel run
 
-Owner: Lukas. Goal: 2 animated English psychology Shorts per day on **YouTube Shorts + TikTok**, improved every day from the analytics.
+Owner: Lukas. Goal: 2 animated English educational Shorts per day (topics vary freely) on **YouTube Shorts + TikTok**, improved every day from the analytics.
 One daily run (started by a scheduled task, ~17:40 Berlin) does everything below. Write all messages to Lukas in **German**, short and direct.
 
 ## 0 · Setup (fresh session)
@@ -31,7 +31,8 @@ For each of the two videos spawn an Agent with `model: "opus"` and this brief: t
 Run the two agents one after the other (they share the CPU).
 
 ### 2a Topic + script
-- Pick a topic from the backlog in channel_memory (or a better one) – never repeat a topic from video_log.
+- Pick a topic from any category (backlog in channel_memory or your own idea) – vary categories, never repeat a topic from video_log,
+  and give the two daily videos different categories unless the analytics clearly favour one.
 - Verify the core fact with WebSearch; note the source (author, year). If the fact is shaky, pick another topic.
 - Write 12 lines (one per scene), 105–125 words total, hook ≤ 13 words, open loop in line 2–3, payoff at the end, and a
   last line that flows grammatically back into line 1 (seamless loop). Short, spoken, no filler ("In this video…").
