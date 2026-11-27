@@ -18,7 +18,10 @@ Read this before every run. Update it after every analytics review. Keep it shor
 ## KEEP (confirmed by data)
 - (none yet – first data expected ~2026-11-29)
 
+- Premium look with love in the details (owner feedback 2026-11-27 on 002/003: "hochwertiger, mehr Liebe im Detail") → RUNBOOK 2b quality bar is mandatory.
+
 ## KILL (confirmed bad)
+- Flat empty layouts: bare shapes on plain cream, empty lower half, frozen characters, hard cuts (owner feedback 2026-11-27).
 - German robotic TTS voices (owner feedback, not analytics).
 
 ## TEST (current hypotheses)

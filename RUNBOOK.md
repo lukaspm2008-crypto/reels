@@ -48,6 +48,20 @@ Run the two agents one after the other (they share the CPU).
 - Rules: a new visual impulse every ≤ 3.5 s (zoom, pop, cut, counter…), something moving in frame 0 (no static first frame),
   numbers shown on screen, lower third (y > 1380) kept free except captions, last scene ends on the exact first frame of scene 1
   (see 001's `s12` crossfade) so the loop is seamless. No real people, brands, logos or copyrighted characters.
+- **Quality bar – "Liebe im Detail" (Lukas, 2026-11-27: videos must look more premium, more love in the details).** Every scene must pass:
+  1. *Full frame*: no big empty areas. The subject fills the upper 2/3 (y 180–1380); floors/walls carry detail (skirting board, tiles,
+     posters, plants, shelf, rug, cables, light patches). Below the caption pill: ground/props continue, never a flat empty strip.
+  2. *Depth*: soft contact shadow under every figure/object, 2-tone shading on big shapes (lighter top, darker side/bottom), subtle
+     background gradient + vignette, foreground element out of focus or overlapping now and then (parallax layer that moves faster).
+  3. *Life*: characters never freeze – blink every 2–4 s, breathing bob, hair/hoodie-string sway, eyes follow the action; ambient motion
+     in every scene (dust motes, steam, flicker, clock hand, swaying lamp, drifting clouds).
+  4. *Transitions*: no plain hard cuts between scenes – use match cuts, whip pans with motion blur, zoom-throughs or wipes in the
+     palette colours (≈ 0.25 s). Pops use squash & stretch + small overshoot; counters tick with a tick SFX.
+  5. *Typography*: headline plate with drop shadow, words pop in one by one; numbers count up; key numbers get a little sticker/badge.
+  6. *Sound*: every visual event has an SFX (whoosh on transitions, pop, tick, ding, paper, footsteps); room tone/ambience fitting the
+     scene (cafeteria murmur, birds, hum) under the voice; music ducked under VO.
+  7. *Polish pass*: before the full build look at ≥ 8 test frames at full size and list for each one thing that could be nicer – fix
+     the top 5. Charts/infographics are illustrated objects (paper card, whiteboard, phone screen), never bare shapes on cream.
 - Check frames before the full build: `python3 engine/run.py episodes/<id> test 1@0.5 1@2.5 5@1 9@2 12@2` and look at the PNGs
   in `build/` (Read tool). Fix overlaps/cut-off text.
 - Build: `python3 engine/run.py episodes/<id>` → `build/final.mp4`, `build/upload.mp4` (< 3.6 MB for browser upload), `build/contact.png`.
